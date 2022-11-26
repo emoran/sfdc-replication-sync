@@ -1,0 +1,9 @@
+%dw 2.0
+
+type auto_ff13e02f_b61f_41e9_9e71_987a1a5d82db_Output_Payload = {|
+  ids?: Array<String>, 
+  latestDateCovered?: DateTime {"typeId": "java.time.LocalDateTime"}
+|} {"typeAlias": "GetUpdatedResult",
+"class": "org.mule.extension.salesforce.api.utility.GetUpdatedResult",
+"typeId": "org.mule.extension.salesforce.api.utility.GetUpdatedResult"}
+

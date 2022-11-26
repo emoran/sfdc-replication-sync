@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:bigquery="http://www.mulesoft.org/schema/mule/bigquery" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/bigquery http://www.mulesoft.org/schema/mule/bigquery/current/mule-bigquery.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	
+	<flow name="Sync" doc:id="49a151f7-67b8-4ec1-b716-b41654ab964e" >
+		<scheduler doc:name="Scheduler" doc:id="bfa2ec61-a2b5-478d-b837-da26c300e692" >
+			<scheduling-strategy >
+				<fixed-frequency startDelay="100" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<flow-ref doc:name="describeReplicationTables" doc:id="125c0662-c8a4-46f3-ab98-1e84b0fa1eb3" name="retrieveControlTableRecords"/>
+	</flow>
+	<flow name="retrieveControlTableRecords" doc:id="d6462aa6-a8b2-4cff-92aa-502edad8b090" >
+		<bigquery:query doc:name="Query control table" doc:id="2aa5858e-29cc-4a60-a5fe-4406136891bc" config-ref="Google_bigquery_Config">
+			<bigquery:query-job >
+				<bigquery:query-string ><![CDATA[SELECT * FROM `mulesoft-368900.salesforce.control` ]]></bigquery:query-string>
+			</bigquery:query-job>
+			<bigquery:job-info-options />
+		</bigquery:query>
+		<ee:transform doc:name="Mapping Query Result" doc:id="57e34e83-0f7e-4613-bc56-806f3a572ffa">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var schema=payload.schema.fields
+---
+payload.values map ((value, index) -> {
+    (schema[0].name): value[0].value,
+    (schema[1].name): value[1].value,
+    (schema[2].name): value[2].value
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="Loop over each table" doc:id="bc5c9cc1-1c5b-4c27-bd4f-b7bde63c40ce" >
+			<ee:transform doc:name="Ignore Columns" doc:id="01871148-7cd0-43c8-9f62-33972bf490d7" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="ignoreColumns" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.ignoreFields default "" splitBy(',')]]></ee:set-variable>
+					<ee:set-variable variableName="tableName" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.tableName]]></ee:set-variable>
+					<ee:set-variable variableName="lastReplicationDate" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.lastReplicationDate]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="describeTable" doc:id="b43112fd-c066-4ff8-95b7-2d54986d5f3e" name="describeTable"/>
+			<flow-ref doc:name="retrieveReplicationData" doc:id="4f9e74f0-31fd-4443-9500-913d99319044" name="retrieveReplicationData"/>
+		</foreach>
+	</flow>
+	<flow name="describeTable" doc:id="e40a8107-69f6-4e0d-8466-0889a1e9ac2c" >
+		<salesforce:describe-sobject type="#[payload.tableName]" doc:name="Describe sobject" doc:id="c859ae18-7b96-4bc1-897d-577b4b2204ca" config-ref="Salesforce_Config"/>
+		<ee:transform doc:name="Collect FIelds" doc:id="84ab0639-5f1f-44f6-b0d7-9495527e634d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+var dropThese = vars.ignoreColumns
+---
+payload.fields filter (not (dropThese contains $."name")) map ((item, index) -> {
+    name: item.name,
+    "type": item."type"
+})]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="tableFields" ><![CDATA[%dw 2.0
+output application/java
+var dropThese = vars.ignoreColumns
+---
+(payload.fields filter (not (dropThese contains $."name")) map ((item, index) -> {
+    name: item.name,
+    "type": item."type"
+})).name]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</flow>
+	<flow name="retrieveReplicationData" doc:id="963c7afd-ab5e-4c44-b42b-9bdc84b4b6f1" >
+		<salesforce:get-updated objectType="#[vars.tableName]" doc:name="Get updated objects" doc:id="3ee54bbc-b989-4b67-a276-2c596be393b8" config-ref="Salesforce_Config" startDate="#[import * from dw::core::Periods&#10;---&#10;((vars.lastReplicationDate &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]" endDate="#[((now() &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="fb75405c-4d89-4733-a34a-30dd54666c27" message='#["Total Records: " ++ sizeOf(payload.ids)]'/>
+		<set-payload value="#[payload.ids]" doc:name="IDS" doc:id="28b1a710-f902-44c1-bdbe-74157c3ed78d" />
+		<batch:job jobName="sfdc-replication-syncBatch_Job" doc:id="2d0a605b-fe7d-42f6-b522-220b7fe8deff" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="67699bdc-2541-42a5-8ff7-f431183ae697" >
+					<batch:aggregator doc:name="Aggregate every 5K records" doc:id="167bc3c1-2ad8-4d78-bd05-884887ddd0cf" size="5000">
+						<flow-ref doc:name="aggregaeRecordResult" doc:id="7b440b7b-16bb-41da-b42f-cbb72ebe92f1" name="aggregaeRecordResult"/>
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="3c03c5ff-8de3-4d11-a31f-dcd5323dcc26" message="File completed"/>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+	<flow name="aggregaeRecordResult" doc:id="ff13e02f-b61f-41e9-9e71-987a1a5d82db" >
+		<ee:transform doc:name="Transform Message" doc:id="b2d60bcd-6614-4c32-9c23-f9b5f5e01803">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	fields:vars.tableFields,
+	ids: payload map $
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+		<salesforce:retrieve type="#[vars.tableName]" doc:name="Retrieve" doc:id="44399e10-2070-481e-a386-8716a2f8a1da" config-ref="Salesforce_Config" />
+		<ee:transform doc:name="Fix output | remove type" doc:id="72b0c782-58b8-467b-8e77-931b1f1afaaa" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+(payload map ((record) -> 
+  record mapObject ((value, key) -> {
+  	 ((key): value replace "\n" with "" replace "," with "" replace "true" with 1 replace "false" with 0) 
+  } - "type" ) 
+)) distinctBy ($)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="to CSV format" doc:id="f9b80c46-57c1-4eb7-87d0-2abe8d656c34" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header=false
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND"/>
+	</flow>
+</mule>

@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_963c7afd_ab5e_4c44_b42b_9bdc84b4b6f1_Input_Payload = Array<{|  name: String | Null,   "type": "STRING" | "BOOLEAN" | "INT" | "DOUBLE" | "DATE" | "DATETIME" | "TIME" | "BASE64" | "ID" | "REFERENCE" | "CURRENCY" | "TEXTAREA" | "PERCENT" | "PHONE" | "URL" | "EMAIL" | "COMBOBOX" | "PICKLIST" | "MULTIPICKLIST" | "ANYTYPE" | "DATACATEGORYGROUPREFERENCE" | "ENCRYPTEDSTRING" | "ADDRESS" | "COMPLEXVALUE" | "LOCATION" | "JSON" | "LONG"|}> | Null
+

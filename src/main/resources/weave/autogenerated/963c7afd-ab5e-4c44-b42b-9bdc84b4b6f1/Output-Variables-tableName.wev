@@ -1,0 +1,9 @@
+%dw 2.0
+
+type auto_963c7afd_ab5e_4c44_b42b_9bdc84b4b6f1_Output_Variables_tableName = java_lang_Object | Null
+type java_lang_Object = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
+
+

@@ -1,0 +1,31 @@
+%dw 2.0
+
+type auto_ff13e02f_b61f_41e9_9e71_987a1a5d82db_Input_Variables_records = Array<{|  message: org_mule_runtime_api_message_Message,   variables: {|    rootMessage: org_mule_runtime_api_message_Message_4,     ignoreColumns: Any,     lastReplicationDate: java_lang_Object_14 | Null,     counter: Number {"typeAlias": "auto_963c7afd-ab5e-4c44-b42b-9bdc84b4b6f1_Input-Variables-counter"},     tableName: java_lang_Object_18 | Null  |}|}>
+type org_mule_runtime_api_message_Message_4 = {|
+  payload: Array<{ _?: java_lang_Object | Null }> | Null, 
+  attributes: Null
+|} {"typeId": "org.mule.runtime.api.message.Message"}
+type java_lang_Object = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
+
+
+
+type java_lang_Object_18 = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
+
+type java_lang_Object_14 = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
+
+type org_mule_runtime_api_message_Message = {|
+  payload: String, 
+  attributes: Null
+|} {"typeId": "org.mule.runtime.api.message.Message"}
+
+
+
