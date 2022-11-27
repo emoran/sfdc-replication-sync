@@ -1,0 +1,9 @@
+%dw 2.0
+
+type auto_d5cdbb23_7c4b_4606_a818_5a9ee5509760_Output_Variables_lastReplicationDate = java_lang_Object | Null
+type java_lang_Object = {|  |} {"typeAlias": "Object",
+"class": "java.lang.Object",
+"typeId": "java.lang.Object"}
+
+
+

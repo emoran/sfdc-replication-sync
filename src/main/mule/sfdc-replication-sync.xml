@@ -99,11 +99,12 @@ var dropThese = vars.ignoreColumns
 			</batch:process-records>
 			<batch:on-complete >
 				<logger level="INFO" doc:name="Logger" doc:id="3c03c5ff-8de3-4d11-a31f-dcd5323dcc26" message="File completed"/>
+				<flow-ref doc:name="replicateData" doc:id="6a7300d4-510a-4c0a-907f-368429047d4a" name="replicateData"/>
 			</batch:on-complete>
 		</batch:job>
 	</flow>
 	<flow name="aggregaeRecordResult" doc:id="ff13e02f-b61f-41e9-9e71-987a1a5d82db" >
-		<ee:transform doc:name="Transform Message" doc:id="b2d60bcd-6614-4c32-9c23-f9b5f5e01803">
+		<ee:transform doc:name="Retrive Request" doc:id="b2d60bcd-6614-4c32-9c23-f9b5f5e01803">
 							<ee:message>
 								<ee:set-payload><![CDATA[%dw 2.0
 output application/java
@@ -130,11 +131,52 @@ output application/java
 		<ee:transform doc:name="to CSV format" doc:id="f9b80c46-57c1-4eb7-87d0-2abe8d656c34" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
-output application/csv header=false
+output application/csv header=true
 ---
 payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND"/>
+	</flow>
+	<flow name="replicateData" doc:id="d5cdbb23-7c4b-4606-a818-5a9ee5509760">
+		<bigquery:delete-table doc:name="Delete Table" doc:id="14ae3870-4cec-4d6c-b9bb-8547e87f9b3b" config-ref="Google_bigquery_Config">
+			<bigquery:table table="AcquiredAccount__c_temp" dataset="salesforce" />
+		</bigquery:delete-table>
+		<bigquery:query doc:name="Recreate Temp table" doc:id="8d4c8868-e447-4a6d-b927-27960e861b78" config-ref="Google_bigquery_Config">
+			<bigquery:query-job defaultDataset="salesforce">
+				<bigquery:query-string><![CDATA[CREATE TABLE `AcquiredAccount__c_temp` LIKE `AcquiredAccount__c`]]></bigquery:query-string>
+			</bigquery:query-job>
+			<bigquery:job-info-options />
+		</bigquery:query>
+		<file:read doc:name="Read" doc:id="fb2a7af7-8bc9-45bd-ba03-b02d65145a89" path="/private/tmp/replication/AcquiredAccount__c.csv"/>
+		<ee:transform doc:name="file to Java" doc:id="4f1ec8d3-e87f-432f-8f8f-eef85fc5b664" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+import try, fail from dw::Runtime
+output application/java
+
+
+fun isDate(value: Any): Boolean = try(() -> value as Date).success
+fun getDate(value: Any): Date | Null | Any = ( if ( isDate(value) ) value 
+            as Date as String else value )
+
+---
+(payload map (item,index) ->{
+    (item mapObject ((value, key, index) -> {
+        (key):(getDate(value))
+    } ))
+} -- vars.ignoreColumns )]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<bigquery:insert-all tableId="AcquiredAccount__c_temp" datasetId="salesforce" doc:name="Insert All" doc:id="379b6e50-91f6-4a26-9239-2d5a77010e6a" config-ref="Google_bigquery_Config" rowsData="#[payload]" ignoreUnknownValues="false"/>
+		<logger level="INFO" doc:name="Logger" doc:id="fc46d786-e88d-44ba-8745-66fee1ad85bc" />
+	</flow>
+	<flow name="sfdc-replication-syncFlow" doc:id="60a3090e-1d3f-410d-9cdc-ada78da1c698" >
+		<scheduler doc:name="Scheduler" doc:id="157e53fe-af26-42d1-8906-50941f627c4e" >
+			<scheduling-strategy >
+				<fixed-frequency startDelay="100" timeUnit="DAYS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<logger level="INFO" doc:name="Logger" doc:id="9e0ca719-a7e7-4de4-86cd-b24e97c49c84" />
 	</flow>
 </mule>
