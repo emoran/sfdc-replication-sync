@@ -184,14 +184,16 @@ VALUES (s.AcctId__c,s.Name,s.BillingState__c,s.CloseDate__c,s.CreatedById,s.Divi
 			</bigquery:query-job>
 			<bigquery:job-info-options />
 		</bigquery:query>
+		<flow-ref doc:name="UpdateReplicationJob" doc:id="94ed719e-2061-4e5a-81fb-ffc800aa7750" name="UpdateReplicationJob"/>
 		<logger level="INFO" doc:name="Logger" doc:id="b9c062cd-5ce4-4449-aac4-5bd57d9a7830" message="#[payload]"/>
 	</flow>
-	<flow name="sfdc-replication-syncFlow" doc:id="60a3090e-1d3f-410d-9cdc-ada78da1c698" >
-		<scheduler doc:name="Scheduler" doc:id="157e53fe-af26-42d1-8906-50941f627c4e" >
-			<scheduling-strategy >
-				<fixed-frequency startDelay="100" timeUnit="DAYS"/>
-			</scheduling-strategy>
-		</scheduler>
-		<logger level="INFO" doc:name="Logger" doc:id="9e0ca719-a7e7-4de4-86cd-b24e97c49c84" />
-	</flow>
+	<sub-flow name="UpdateReplicationJob" doc:id="27bfe60a-9587-4a9f-8c1c-bffd858dbd4a" >
+		<bigquery:query doc:name="Update Replication Date" doc:id="e36e9795-dc9e-4a0f-8180-2f7375aeba91" config-ref="Google_bigquery_Config" >
+			<bigquery:query-job defaultDataset="salesforce" >
+				<bigquery:query-string ><![CDATA[Update `control` set lastReplicationDate = CURRENT_TIME where tableName = 'AcquiredAccount__c']]></bigquery:query-string>
+			</bigquery:query-job>
+			<bigquery:job-info-options />
+		</bigquery:query>
+		<file:delete doc:name="Delete file" doc:id="5831b493-216c-42e4-9113-a45bc4be547a" path="/private/tmp/replication/AcquiredAccount__c.csv"/>
+	</sub-flow>
 </mule>
