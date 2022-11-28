@@ -88,11 +88,12 @@ var dropThese = vars.ignoreColumns
 	<flow name="retrieveReplicationData" doc:id="963c7afd-ab5e-4c44-b42b-9bdc84b4b6f1" >
 		<salesforce:get-updated objectType="#[vars.tableName]" doc:name="Get updated objects" doc:id="3ee54bbc-b989-4b67-a276-2c596be393b8" config-ref="Salesforce_Config" startDate="#[import * from dw::core::Periods&#10;---&#10;((vars.lastReplicationDate &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]" endDate="#[((now() &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]"/>
 		<logger level="INFO" doc:name="Logger" doc:id="fb75405c-4d89-4733-a34a-30dd54666c27" message='#["Total Records: " ++ sizeOf(payload.ids)]'/>
+		<set-variable value="#[sizeOf(payload.ids)]" doc:name="Total Records" doc:id="14fde87e-4099-44db-a0c3-d4a746611bf7" variableName="totalRecords"/>
 		<set-payload value="#[payload.ids]" doc:name="IDS" doc:id="28b1a710-f902-44c1-bdbe-74157c3ed78d" />
 		<batch:job jobName="sfdc-replication-syncBatch_Job" doc:id="2d0a605b-fe7d-42f6-b522-220b7fe8deff" >
 			<batch:process-records >
 				<batch:step name="Batch_Step" doc:id="67699bdc-2541-42a5-8ff7-f431183ae697" >
-					<batch:aggregator doc:name="Aggregate every 5K records" doc:id="167bc3c1-2ad8-4d78-bd05-884887ddd0cf" size="5000">
+					<batch:aggregator doc:name="Aggregate every 2K records" doc:id="167bc3c1-2ad8-4d78-bd05-884887ddd0cf" size="2000">
 						<flow-ref doc:name="aggregaeRecordResult" doc:id="7b440b7b-16bb-41da-b42f-cbb72ebe92f1" name="aggregaeRecordResult"/>
 					</batch:aggregator>
 				</batch:step>
@@ -117,7 +118,7 @@ var dropThese = vars.ignoreColumns
 output application/java
 ---
 {
-	fields:vars.tableFields,
+	fields:(vars.tableFields map {name: $}).name,
 	ids: payload map $
 }]]></ee:set-payload>
 							</ee:message>
@@ -130,20 +131,20 @@ output application/java
 ---
 (payload map ((record) -> 
   record mapObject ((value, key) -> {
-  	 ((key): value replace "\n" with "" replace "," with "" replace "true" with 1 replace "false" with 0) 
+  	 ((key): value replace "\n" with "" replace "," with "") 
   } - "type" ) 
 )) distinctBy ($)]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<ee:transform doc:name="to CSV format" doc:id="f9b80c46-57c1-4eb7-87d0-2abe8d656c34" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
+		<ee:transform doc:name="to CSV format" doc:id="f9b80c46-57c1-4eb7-87d0-2abe8d656c34">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
 output application/csv header=true
 ---
 payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND"/>
+		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND" />
 	</flow>
 	<flow name="replicateData" doc:id="d5cdbb23-7c4b-4606-a818-5a9ee5509760">
 		<bigquery:delete-table doc:name="Delete Table" doc:id="14ae3870-4cec-4d6c-b9bb-8547e87f9b3b" config-ref="Google_bigquery_Config">
