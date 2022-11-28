@@ -99,7 +99,14 @@ var dropThese = vars.ignoreColumns
 			</batch:process-records>
 			<batch:on-complete >
 				<logger level="INFO" doc:name="Logger" doc:id="3c03c5ff-8de3-4d11-a31f-dcd5323dcc26" message="File completed"/>
-				<flow-ref doc:name="replicateData" doc:id="6a7300d4-510a-4c0a-907f-368429047d4a" name="replicateData"/>
+				<choice doc:name="Choice" doc:id="6d6a4465-024b-40ed-92e5-b2fe1e5839cf" >
+					<when expression="#[payload.totalRecords &gt; 0]">
+						<flow-ref doc:name="replicateData" doc:id="6a7300d4-510a-4c0a-907f-368429047d4a" name="replicateData" />
+					</when>
+					<otherwise >
+						<logger level="INFO" doc:name="Logger" doc:id="e6145add-184b-408a-83f9-356794fe2dac" message="No records to process."/>
+					</otherwise>
+				</choice>
 			</batch:on-complete>
 		</batch:job>
 	</flow>
@@ -190,7 +197,7 @@ VALUES (s.AcctId__c,s.Name,s.BillingState__c,s.CloseDate__c,s.CreatedById,s.Divi
 	<sub-flow name="UpdateReplicationJob" doc:id="27bfe60a-9587-4a9f-8c1c-bffd858dbd4a" >
 		<bigquery:query doc:name="Update Replication Date" doc:id="e36e9795-dc9e-4a0f-8180-2f7375aeba91" config-ref="Google_bigquery_Config" >
 			<bigquery:query-job defaultDataset="salesforce" >
-				<bigquery:query-string ><![CDATA[Update `control` set lastReplicationDate = CURRENT_TIME where tableName = 'AcquiredAccount__c']]></bigquery:query-string>
+				<bigquery:query-string ><![CDATA[Update `control` set lastReplicationDate = CURRENT_DATETIME() where tableName = 'AcquiredAccount__c']]></bigquery:query-string>
 			</bigquery:query-job>
 			<bigquery:job-info-options />
 		</bigquery:query>
