@@ -84,7 +84,19 @@ var dropThese = vars.ignoreColumns
 })).name]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
+		<flow-ref doc:name="writeTemporalFile" doc:id="07fb2683-7f92-4599-a376-dc12524b5a43" name="writeTemporalFile" />
 	</flow>
+	<sub-flow name="writeTemporalFile" doc:id="824f04c0-d4ec-4979-a529-a762e4e7d79d">
+		<ee:transform doc:name="Writting Headers" doc:id="aa44f5be-cc95-41f7-b122-41df5a5df82b">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+(vars.tableFields map {name: $}).name joinBy "," ++ "\n"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="4f41f12d-82c2-43d8-87e1-7a0404b9d191" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND" />
+	</sub-flow>
 	<flow name="retrieveReplicationData" doc:id="963c7afd-ab5e-4c44-b42b-9bdc84b4b6f1" >
 		<salesforce:get-updated objectType="#[vars.tableName]" doc:name="Get updated objects" doc:id="3ee54bbc-b989-4b67-a276-2c596be393b8" config-ref="Salesforce_Config" startDate="#[import * from dw::core::Periods&#10;---&#10;((vars.lastReplicationDate &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]" endDate="#[((now() &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]"/>
 		<logger level="INFO" doc:name="Logger" doc:id="fb75405c-4d89-4733-a34a-30dd54666c27" message='#["Total Records: " ++ sizeOf(payload.ids)]'/>
@@ -93,8 +105,9 @@ var dropThese = vars.ignoreColumns
 		<batch:job jobName="sfdc-replication-syncBatch_Job" doc:id="2d0a605b-fe7d-42f6-b522-220b7fe8deff" >
 			<batch:process-records >
 				<batch:step name="Batch_Step" doc:id="67699bdc-2541-42a5-8ff7-f431183ae697" >
-					<batch:aggregator doc:name="Aggregate every 2K records" doc:id="167bc3c1-2ad8-4d78-bd05-884887ddd0cf" size="2000">
-						<flow-ref doc:name="aggregaeRecordResult" doc:id="7b440b7b-16bb-41da-b42f-cbb72ebe92f1" name="aggregaeRecordResult"/>
+					<batch:aggregator doc:name="Commit 2K records" doc:id="3d32fd2e-fd50-4f22-861e-464d6b24e17c" size="2000">
+						<set-variable value="#[false]" doc:name="writeHeaders false" doc:id="e22dd071-931d-449d-9743-befd61c51828" variableName="writeHeaders"/>
+						<flow-ref doc:name="aggregaeRecordResult" doc:id="7b440b7b-16bb-41da-b42f-cbb72ebe92f1" name="aggregaeRecordResult" />
 					</batch:aggregator>
 				</batch:step>
 			</batch:process-records>
@@ -110,6 +123,23 @@ var dropThese = vars.ignoreColumns
 				</choice>
 			</batch:on-complete>
 		</batch:job>
+	</flow>
+	<flow name="WriteFileHeaders" doc:id="a6a7c7ca-ae18-4259-845f-8e56d4aed56c" >
+		<ee:transform doc:name="firstRecord" doc:id="6b30eaaa-fc51-4317-85ec-8a7bd7334b63" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[payload.ids[0]]]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="writeHeaders" ><![CDATA[%dw 2.0
+output application/java
+---
+true]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="aggregaeRecordResult" doc:id="531fbf9f-f0f9-452d-a60a-b2db79f05ecd" name="aggregaeRecordResult"/>
 	</flow>
 	<flow name="aggregaeRecordResult" doc:id="ff13e02f-b61f-41e9-9e71-987a1a5d82db" >
 		<ee:transform doc:name="Retrive Request" doc:id="b2d60bcd-6614-4c32-9c23-f9b5f5e01803">
@@ -136,14 +166,28 @@ output application/java
 )) distinctBy ($)]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<ee:transform doc:name="to CSV format" doc:id="f9b80c46-57c1-4eb7-87d0-2abe8d656c34">
+		<choice doc:name="Write Headers" doc:id="9c749054-8869-48b4-b2a6-674426238871" >
+			<when expression="#[vars.writeHeaders == true]">
+				<ee:transform doc:name="to CSV format" doc:id="006506f8-65d5-4b86-a6fe-026f13b32163" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv header=true
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="to CSV format" doc:id="f9b80c46-57c1-4eb7-87d0-2abe8d656c34">
 			<ee:message>
 				<ee:set-payload><![CDATA[%dw 2.0
-output application/csv header=true
+output application/csv header=false
 ---
 payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+			</otherwise>
+		</choice>
 		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND" />
 	</flow>
 	<flow name="replicateData" doc:id="d5cdbb23-7c4b-4606-a818-5a9ee5509760">
