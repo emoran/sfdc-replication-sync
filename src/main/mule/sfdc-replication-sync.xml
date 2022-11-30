@@ -84,21 +84,10 @@ var dropThese = vars.ignoreColumns
 })).name]]></ee:set-variable>
 			</ee:variables>
 		</ee:transform>
-		<flow-ref doc:name="writeTemporalFile" doc:id="07fb2683-7f92-4599-a376-dc12524b5a43" name="writeTemporalFile" />
 	</flow>
-	<sub-flow name="writeTemporalFile" doc:id="824f04c0-d4ec-4979-a529-a762e4e7d79d">
-		<ee:transform doc:name="Writting Headers" doc:id="aa44f5be-cc95-41f7-b122-41df5a5df82b">
-			<ee:message>
-				<ee:set-payload><![CDATA[%dw 2.0
-output application/java
----
-(vars.tableFields map {name: $}).name joinBy "," ++ "\n"]]></ee:set-payload>
-			</ee:message>
-		</ee:transform>
-		<file:write doc:name="Write" doc:id="4f41f12d-82c2-43d8-87e1-7a0404b9d191" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND" />
-	</sub-flow>
 	<flow name="retrieveReplicationData" doc:id="963c7afd-ab5e-4c44-b42b-9bdc84b4b6f1" >
 		<salesforce:get-updated objectType="#[vars.tableName]" doc:name="Get updated objects" doc:id="3ee54bbc-b989-4b67-a276-2c596be393b8" config-ref="Salesforce_Config" startDate="#[import * from dw::core::Periods&#10;---&#10;((vars.lastReplicationDate &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]" endDate="#[((now() &gt;&gt; &quot;UTC&quot;) as LocalDateTime {format : &quot;yyyy-MM-dd'T'HH:mm&quot;})]"/>
+		<flow-ref doc:name="writeTemporalFile" doc:id="07fb2683-7f92-4599-a376-dc12524b5a43" name="WriteFileHeaders" target="tempHeader"/>
 		<logger level="INFO" doc:name="Logger" doc:id="fb75405c-4d89-4733-a34a-30dd54666c27" message='#["Total Records: " ++ sizeOf(payload.ids)]'/>
 		<set-variable value="#[sizeOf(payload.ids)]" doc:name="Total Records" doc:id="14fde87e-4099-44db-a0c3-d4a746611bf7" variableName="totalRecords"/>
 		<set-payload value="#[payload.ids]" doc:name="IDS" doc:id="28b1a710-f902-44c1-bdbe-74157c3ed78d" />
@@ -148,7 +137,7 @@ true]]></ee:set-variable>
 output application/java
 ---
 {
-	fields:(vars.tableFields map {name: $}).name,
+	fields:((vars.tableFields  map {name: $}).name orderBy $) ,
 	ids: payload map $
 }]]></ee:set-payload>
 							</ee:message>
@@ -164,6 +153,14 @@ output application/java
   	 ((key): value replace "\n" with "" replace "," with "") 
   } - "type" ) 
 )) distinctBy ($)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Order Records" doc:id="febf41e6-b210-4f93-9f4b-34520358acbe" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ($ orderBy $$)]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<choice doc:name="Write Headers" doc:id="9c749054-8869-48b4-b2a6-674426238871" >
@@ -188,7 +185,7 @@ payload]]></ee:set-payload>
 		</ee:transform>
 			</otherwise>
 		</choice>
-		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND" />
+		<file:write doc:name="Write" doc:id="1edbdc0e-e389-459f-b67f-fcfe75aca7fb" path='#["/tmp/replication/" ++ vars.tableName ++ ".csv"]' mode="APPEND" createParentDirectories="false"/>
 	</flow>
 	<flow name="replicateData" doc:id="d5cdbb23-7c4b-4606-a818-5a9ee5509760">
 		<bigquery:delete-table doc:name="Delete Table" doc:id="14ae3870-4cec-4d6c-b9bb-8547e87f9b3b" config-ref="Google_bigquery_Config">
@@ -218,6 +215,14 @@ fun getDate(value: Any): Date | Null | Any = ( if ( isDate(value) ) value
         (key):(getDate(value))
     } ))
 } -- vars.ignoreColumns )]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Remove duplicate ids" doc:id="84bfc355-c196-4723-8329-ab592016268e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload distinctBy $.Id]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<until-successful maxRetries="5" doc:name="Until Successful" doc:id="485d3c3f-0852-443b-9523-d29fd4564c59" >
