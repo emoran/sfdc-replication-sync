@@ -226,7 +226,7 @@ payload distinctBy $.Id]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<until-successful maxRetries="5" doc:name="Until Successful" doc:id="485d3c3f-0852-443b-9523-d29fd4564c59" >
-			<bigquery:insert-all tableId="AcquiredAccount__c_temp" datasetId="salesforce" doc:name="Insert All" doc:id="379b6e50-91f6-4a26-9239-2d5a77010e6a" config-ref="Google_bigquery_Config" rowsData="#[payload]" ignoreUnknownValues="false" />
+			<bigquery:insert-all tableId="AcquiredAccount__c_temp" datasetId="salesforce" doc:name="Insert All" doc:id="379b6e50-91f6-4a26-9239-2d5a77010e6a" config-ref="Google_bigquery_Config" rowsData="#[payload]"/>
 		</until-successful>
 		<logger level="INFO" doc:name="Logger" doc:id="fc46d786-e88d-44ba-8745-66fee1ad85bc" />
 		<bigquery:query doc:name="Merge Operation" doc:id="3c77872f-212f-4212-b92e-77a1266f3bd9" config-ref="Google_bigquery_Config" >
