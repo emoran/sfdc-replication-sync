@@ -226,7 +226,7 @@ payload distinctBy $.Id]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<until-successful maxRetries="5" doc:name="Until Successful" doc:id="485d3c3f-0852-443b-9523-d29fd4564c59" >
-			<bigquery:insert-all tableId="AcquiredAccount__c_temp" datasetId="salesforce" doc:name="Insert All" doc:id="379b6e50-91f6-4a26-9239-2d5a77010e6a" config-ref="Google_bigquery_Config" rowsData="#[payload]"/>
+			<bigquery:insert-all tableId="AcquiredAccount__c_temp" datasetId="salesforce" doc:name="Insert All" doc:id="379b6e50-91f6-4a26-9239-2d5a77010e6a" config-ref="Google_bigquery_Config" rowsData="#[payload]" skipInvalidRows="true"/>
 		</until-successful>
 		<logger level="INFO" doc:name="Logger" doc:id="fc46d786-e88d-44ba-8745-66fee1ad85bc" />
 		<bigquery:query doc:name="Merge Operation" doc:id="3c77872f-212f-4212-b92e-77a1266f3bd9" config-ref="Google_bigquery_Config" >
@@ -242,7 +242,7 @@ VALUES (s.AcctId__c,s.Name,s.BillingState__c,s.CloseDate__c,s.CreatedById,s.Divi
 			<bigquery:job-info-options />
 		</bigquery:query>
 		<flow-ref doc:name="UpdateReplicationJob" doc:id="94ed719e-2061-4e5a-81fb-ffc800aa7750" name="UpdateReplicationJob"/>
-		<logger level="INFO" doc:name="Logger" doc:id="b9c062cd-5ce4-4449-aac4-5bd57d9a7830" message="#[payload]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b9c062cd-5ce4-4449-aac4-5bd57d9a7830" message='#["Sync completed"]'/>
 	</flow>
 	<sub-flow name="UpdateReplicationJob" doc:id="27bfe60a-9587-4a9f-8c1c-bffd858dbd4a" >
 		<bigquery:query doc:name="Update Replication Date" doc:id="e36e9795-dc9e-4a0f-8180-2f7375aeba91" config-ref="Google_bigquery_Config" >
